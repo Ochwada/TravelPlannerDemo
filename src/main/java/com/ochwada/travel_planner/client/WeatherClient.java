@@ -1,8 +1,10 @@
 package com.ochwada.travel_planner.client;
 
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -69,39 +71,38 @@ public class WeatherClient {
     /**
      * Fetches current weather information for a given city using the OpenWeather API.
      *
-     * @param cityName the name of the city to query
-     * @return a {@link WeatherData} object containing temperature and description (currently returns {@code null})
+     * <p>Makes a synchronous HTTP GET request to the API using {@link RestTemplate},
+     * then parses the JSON response using {@link com.fasterxml.jackson.databind.ObjectMapper}
+     * to extract the weather description and temperature.
+     *
+     * @param cityName the name of the city to query (e.g., "Berlin")
+     * @return a {@link WeatherData} object containing the weather description and temperature in Celsius
+     * @throws RuntimeException if the JSON response cannot be parsed
      */
     public WeatherData getWeatherForCity(String cityName) {
+        // Construct the full URL with query parameters
         String url = String.format("%s?q=%s&appid=%s&units=metric", apiUrl, cityName, apiKey);
-        /**
-         * Sends an HTTP GET request to the specified {@code url} and expects a response body of type {@code String}.
-         *
-         * <p>This call uses {@link RestTemplate#getForEntity(String, Class)} which:
-         * <ul>
-         *   <li>Makes a synchronous HTTP GET request</li>
-         *   <li>Returns a {@link ResponseEntity} that wraps the full HTTP response, including status code, headers, and body</li>
-         *   <li>Maps the response body into a {@code String} (in this case, the raw JSON from the weather API)</li>
-         * </ul>
-         *
-         * @param url the full API URL including query parameters
-         * @return {@code ResponseEntity<String>} containing the raw JSON response from OpenWeather API
-         * ***
-         * It performs a GET request to the provided URL; It expects the response body to be a String.
-         * It returns a ResponseEntity that gives you access to:
-         *         1. the raw JSON (response.getBody())
-         *         2. the status code (response.getStatusCode())
-         *         3. any HTTP headers (response.getHeaders())
-         */
 
+        // Send a GET request to the OpenWeather API and retrieve the response as a raw JSON string
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-        /**
-         * getForEntity: makes GET request
-         * @returns ResponseEntity with body as String
-         * Spring handles connection and response parsing
-         * */
-        return null;
+
+        // Parse the JSON and extract weather data
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            JsonNode json = mapper.readTree(response.getBody());
+
+            // Extract weather description and temperature from the JSON structure
+            String description = json.path("weather").get(0).path("description").asText();
+            double temperature = json.path("main").path("temp").asDouble();
+            return new WeatherData(description, temperature);
+
+        } catch (JsonProcessingException e) {
+            // Wrap JSON parsing exceptions as unchecked exceptions
+            throw new RuntimeException(e);
+        }
     }
+
+    // =======================================WeatherData POJO ==================================================
 
     /**
      * Simple POJO to hold weather data results returned from the API.
