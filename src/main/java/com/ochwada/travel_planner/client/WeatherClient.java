@@ -72,9 +72,9 @@ public class WeatherClient {
      * @param objectMapper the JSON parser used to map API responses to Java objects
      */
     @Autowired
-    public WeatherClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
+    public WeatherClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate; // From external resources (Spring Web)
+        this.objectMapper = new ObjectMapper();
     }
 
 
