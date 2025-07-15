@@ -35,6 +35,9 @@ import org.springframework.web.client.RestTemplate;
 @Component // Tells Spring Boot to manage this class as a bean for dependency injection
 public class WeatherClient {
 
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
     /**
      * API key for authenticating requests to the OpenWeather API.
      * Injected from the property {@code openweather.api.key}.
@@ -55,18 +58,25 @@ public class WeatherClient {
      * <p>This instance is used by {@code WeatherClient} to send requests to the OpenWeather API
      * and retrieve weather data as JSON responses.
      */
-    private final RestTemplate restTemplate;
+
 
     /**
-     * Constructs a {@code WeatherClient} with a {@link RestTemplate} instance.
-     * The {@code RestTemplate} is injected by Spring via constructor injection.
+     * Constructs a {@code WeatherClient} with the given {@link RestTemplate} and {@link ObjectMapper}.
+     * <p>
+     * This client is responsible for interacting with the OpenWeather API to retrieve weather data.
+     * The {@code RestTemplate} is used to perform HTTP requests, while the {@code ObjectMapper}
+     * is used to parse JSON responses.
+     * </p>
      *
-     * @param restTemplate the HTTP client used for sending requests to the OpenWeather API
+     * @param restTemplate the HTTP client used to send requests to the OpenWeather API
+     * @param objectMapper the JSON parser used to map API responses to Java objects
      */
     @Autowired
-    public WeatherClient(RestTemplate restTemplate) {
+    public WeatherClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
+
 
     /**
      * Fetches current weather information for a given city using the OpenWeather API.
@@ -83,22 +93,56 @@ public class WeatherClient {
         // Construct the full URL with query parameters
         String url = String.format("%s?q=%s&appid=%s&units=metric", apiUrl, cityName, apiKey);
 
-        // Send a GET request to the OpenWeather API and retrieve the response as a raw JSON string
-        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
 
-        // Parse the JSON and extract weather data
-        ObjectMapper mapper = new ObjectMapper();
         try {
-            JsonNode json = mapper.readTree(response.getBody());
+            //JsonNode json = mapper.readTree(response.getBody());
+            /**
+             * Makes an HTTP GET request to the given URL and retrieves the response body as a String.
+             * “Hey Spring, please GET this URL and convert the response body to a String.”
+             * Uses RestTemplate's getForObject() method to perform a synchronous call. Automatically handles connection,
+             * request execution, and response parsing.
+             *
+             * @param url the complete URL to call (including query parameters)
+             * @return the response body as a plain String
+             */
+            String response = restTemplate.getForObject(url, String.class);
 
-            // Extract weather description and temperature from the JSON structure
-            String description = json.path("weather").get(0).path("description").asText();
-            double temperature = json.path("main").path("temp").asDouble();
+            /**
+             * Parses the JSON response String into a Jackson JsonNode tree. Uses ObjectMapper's readTree() method to
+             * convert the raw JSON text into a navigable tree structure, enabling easy access to fields without defining
+             * a full Java class.
+             *
+             * @param response the JSON response body as a String
+             * @return a JsonNode representing the root of the JSON tree
+             */
+            JsonNode root = objectMapper.readTree(response);
+
+            /**
+             * Extracts the weather description from the JSON tree.
+             * Navigates to the "weather" array in the JSON, selects the first object, and retrieves the value of its
+             * "description" field as text.
+             * Example JSON path: weather[0].description
+             *
+             * @param root the root JsonNode of the parsed JSON response
+             * @return the weather description text
+             */
+            String description = root.path("weather").get(0).path("description").asText();
+
+            /**
+             * Extracts the temperature value from the JSON tree.
+             * Navigates to the "main" object in the JSON and retrieves the "temp" field as a double value representing
+             * the temperature in Celsius.
+             * Example JSON path: main.temp
+             *
+             * @param root the root JsonNode of the parsed JSON response
+             * @return the temperature value in Celsius
+             */
+            double temperature = root.path("main").path("temp").asDouble();
+
             return new WeatherData(description, temperature);
 
-        } catch (JsonProcessingException e) {
-            // Wrap JSON parsing exceptions as unchecked exceptions
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch weather data: " + e.getMessage());
         }
     }
 
