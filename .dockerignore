@@ -1,6 +1,13 @@
+# --------- folders ---------
 target/
 .idea/
 .mvn/
+.git
+
+# --------- files ---------
+.env
+.gitattributes
+.gitignore
 *.iml
 *.log
 *.properties
